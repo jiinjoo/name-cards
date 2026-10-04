@@ -39,6 +39,7 @@ Guide for AI coding agents (and humans) working in this repository.
 | Unit tests | `make test` (Swift Testing; see note below) |
 | Build `NameCards.app` (release, signed) | `make app` |
 | Build and launch the app | `make run` |
+| OCR + parse card images from the terminal | `swift run nc-scan [--region SG] [--lines] card.jpg …` |
 | Clean | `make clean` |
 
 Tests use **Swift Testing** (`import Testing`, `@Test`, `#expect`). XCTest is not available with Command Line
@@ -55,15 +56,19 @@ Resources/Info.plist              bundle metadata + NSCameraUsageDescription / N
 scripts/bundle.sh                 swift build -c release → NameCards.app → codesign
 Sources/NameCardsCore/            pure logic, no SwiftUI; everything here is unit-testable
   Model/        DraftContact (fields + per-field confidence), FieldChange, etc.
-  OCR/          TextRecognizer: VNRecognizeTextRequest → lines with bounding boxes
-  Parse/        CardParser (heuristics + NSDataDetector), ClaudeParser (optional, URLSession)
+  OCR/          TextRecognizer: two-pass Vision OCR → lines with bounding boxes
+  Parse/        CardParser (line classification + name selection), PhoneNumbers (labels, E.164),
+                NameSplitter (Latin/Malay/CJK name order), Keywords (multilingual tables), Script;
+                ClaudeParser (optional, URLSession — not built yet)
   Match/        ContactMatcher: normalised email/phone exact match, fuzzy name + company
   Merge/        MergePlanner: DraftContact × existing contact → [FieldChange]
   Store/        ContactStoring protocol + CNContactStore implementation (iCloud container, groups)
+Sources/nc-scan/                  developer CLI: run OCR + parser on image files
 Sources/NameCards/                SwiftUI app target
   Capture/      CameraController (AVCaptureSession), CardDetector (rectangles, stability, sharpness, dedupe)
   UI/           ScanView, ReviewListView, MergeSheet, SettingsView
-Tests/NameCardsCoreTests/         parser fixtures (EN/ZH/JA/KO OCR outputs), matcher, merge planner
+Tests/NameCardsCoreTests/         parser fixtures (EN/ZH/JA/KO OCR outputs), end-to-end Vision tests on
+                                  rendered cards, matcher, merge planner
 ```
 
 Pipeline: `capture → crop → OCR → parse (+ optional Claude) → match → review queue → merge sheet → save`.
@@ -76,8 +81,13 @@ Pipeline: `capture → crop → OCR → parse (+ optional Claude) → match → 
   Foundation are fine there.
 - Parsing and matching functions should be pure: input is OCR lines and fields, output is values. Add a
   fixture test for every parser bug fixed.
-- Phone numbers are normalised to E.164 using a configurable default region. Emails are compared
-  lowercased and trimmed.
+- Phone numbers are normalised to E.164. The region comes from the card itself (address country, then the
+  email/web TLD, then kana/hangul), falling back to the configured default. Numbers whose country can't be
+  determined are kept as printed, with lower confidence. Emails are compared lowercased and trimmed.
+- OCR: Vision only reads CJK well when that language is listed *first* in `recognitionLanguages`, and no
+  single ordering covers zh/ja/ko together. `TextRecognizer` therefore auto-detects first, then re-runs with
+  the dominant CJK language first. Keep the `TextRecognizerTests` end-to-end tests passing if you touch this.
+- When a fixture comes from a real card, capture its OCR lines with `swift run nc-scan --lines`.
 - CJK cards: the native-script name is the primary name. A Latin-script variant goes to the phonetic name
   fields or the nickname.
 - Prefer Apple frameworks over third-party dependencies. Add a package only with a clear reason recorded in
