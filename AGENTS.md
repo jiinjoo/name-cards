@@ -68,7 +68,8 @@ Sources/NameCardsCore/            pure logic, no SwiftUI; everything here is uni
                 CardReader: OCR + parse, recovering sideways/upside-down cards
   Parse/        CardParser (line classification + name selection), PhoneNumbers (labels, E.164),
                 NameSplitter (Latin/Malay/CJK name order), Keywords (multilingual tables), Script;
-                ClaudeParser (optional, URLSession — not built yet)
+                ClaudeParser (optional: raw HTTP to the Messages API, schema-constrained JSON, merged
+                with the on-device result so no phone/email it found is lost)
   Match/        SessionDeduper (same card scanned twice in a session); ContactMatcher (email / mobile exact,
                 Jaro-Winkler name incl. phonetic + company); TextSimilarity
   Merge/        MergePlanner: DraftContact × ContactSnapshot → MergePlan of FieldChanges (add pre-ticked,
@@ -81,6 +82,8 @@ Sources/NameCards/                SwiftUI app target
   Capture/      CameraController: AVCaptureSession, analyses frames on its video queue, photo capture
   Scan/         CardSession (@MainActor @Observable: all cards, reading, dedupe, debounced persistence),
                 ScanModel (camera state only), CardProcessor (actor: OCR one card at a time; image I/O)
+  Settings/     AppSettings (UserDefaults keys), APIKeyStore (Keychain), SettingsView (region, contact
+                options, Claude toggle + key + Test, clear saved cards)
   Save/         SaveModel (permission → match approved cards → save; marks cards saved), SaveSheet (new vs
                 merge picker, tickable changes, event group / photo options)
   UI/           RootView (Scan | Review switch; camera stops while reviewing), ScanView, CameraPreview,
@@ -115,8 +118,12 @@ Pipeline: `capture → crop → OCR → parse (+ optional Claude) → match → 
   fields or the nickname.
 - Prefer Apple frameworks over third-party dependencies. Add a package only with a clear reason recorded in
   the commit message.
-- If you touch the Claude parser, look up the current model ID and Messages API shape (the `claude-api`
-  skill) rather than relying on memory.
+- Claude parser: Swift has no official Anthropic SDK, so it's raw HTTP (`URLSession`). Model `claude-opus-5-5`
+  at effort `low`, structured outputs via `output_config.format` (every schema property required,
+  `additionalProperties: false`), and `fallbacks: "default"` with the `server-side-fallback-2026-07-01`
+  beta header. Check `stop_reason` (`refusal`, `max_tokens`) before reading the text block, and skip
+  thinking blocks. Before changing any of this, look up the current API in the `claude-api` skill rather
+  than relying on memory. If Claude fails, the card falls back to the on-device result and a notice is shown.
 
 ## Definition of done
 

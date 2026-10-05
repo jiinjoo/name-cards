@@ -24,11 +24,11 @@ final class SaveModel {
     private(set) var phase = Phase.loading
     var items: [SaveItem] = []
     private(set) var account: ContactsAccount?
-    var addToEventGroup = UserDefaults.standard.object(forKey: "addToEventGroup") as? Bool ?? true {
-        didSet { UserDefaults.standard.set(addToEventGroup, forKey: "addToEventGroup") }
+    var addToEventGroup = UserDefaults.standard.object(forKey: AppSettings.Key.addToEventGroup) as? Bool ?? true {
+        didSet { UserDefaults.standard.set(addToEventGroup, forKey: AppSettings.Key.addToEventGroup) }
     }
-    var useCardAsPhoto = UserDefaults.standard.bool(forKey: "useCardAsPhoto") {
-        didSet { UserDefaults.standard.set(useCardAsPhoto, forKey: "useCardAsPhoto") }
+    var useCardAsPhoto = UserDefaults.standard.bool(forKey: AppSettings.Key.useCardAsPhoto) {
+        didSet { UserDefaults.standard.set(useCardAsPhoto, forKey: AppSettings.Key.useCardAsPhoto) }
     }
 
     let session: CardSession

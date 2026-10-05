@@ -79,6 +79,9 @@ struct ReviewDetail: View {
                         .foregroundStyle(.orange)
                 }
                 Spacer()
+                Button("Read Again") { session.retry(cardID) }
+                    .help("Re-read this card with the current settings, e.g. after turning on Claude. Replaces your edits.")
+                    .disabled(card?.record.status == .reading)
                 Button("Skip") {
                     session.setReview(cardID, .skipped)
                     onDone()

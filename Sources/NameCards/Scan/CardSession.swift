@@ -19,17 +19,15 @@ final class CardSession {
     }
     /// Short status message, e.g. a duplicate that was skipped.
     private(set) var notice: String?
-    /// Default region for phone numbers on cards that don't reveal their country.
-    let region: String
+    /// Default region for phone numbers on cards that don't reveal their country (Settings).
+    var region: String { AppSettings.defaultRegion }
 
     private let store = SessionStore.standard
-    private let processor: CardProcessor
+    private let processor = CardProcessor()
     private var saveTask: Task<Void, Never>?
     private var noticeTask: Task<Void, Never>?
 
     init() {
-        region = UserDefaults.standard.string(forKey: "defaultRegion") ?? Locale.current.region?.identifier ?? "US"
-        processor = CardProcessor(region: region)
         restore()
     }
 
@@ -56,6 +54,7 @@ final class CardSession {
         }
     }
 
+    /// Reads the card again with the current settings (e.g. after turning on Claude). Replaces any edits.
     func retry(_ id: UUID) {
         guard let index = index(of: id), let image = cards[index].image else { return }
         cards[index].record.status = .reading
@@ -64,7 +63,12 @@ final class CardSession {
 
     private func read(_ id: UUID, image: CGImage) async {
         do {
-            let result = try await processor.read(image)
+            let claudeKey = AppSettings.useClaude ? APIKeyStore.load() ?? "" : nil
+            let output = try await processor.read(image, region: region, claudeKey: claudeKey)
+            let result = output.result
+            if let error = output.claudeError {
+                show(notice: "Claude unavailable, used on-device reading: \(error)")
+            }
             guard let index = index(of: id) else { return }
             let earlier = cards.filter { $0.id != id && $0.record.status == .ready }.compactMap(\.record.draft)
             if let original = SessionDeduper.duplicate(of: result.draft, in: earlier) {
@@ -115,6 +119,15 @@ final class CardSession {
         try? FileManager.default.removeItem(at: store.imageURL(for: record))
         scheduleSave()
     }
+
+    var savedCount: Int { cards.filter { $0.record.review == .saved }.count }
+
+    /// Removes cards already saved to Contacts (and their images) from the session.
+    func clearSaved() {
+        for card in cards where card.record.review == .saved { remove(card.id) }
+    }
+
+    var directory: URL { store.directory }
 
     // MARK: Persistence
 

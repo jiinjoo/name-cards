@@ -4,16 +4,25 @@ import ImageIO
 import NameCardsCore
 import UniformTypeIdentifiers
 
-/// Reads captured cards one at a time.
+/// Reads captured cards one at a time: on-device OCR and parsing, then Claude's labelling if enabled.
 actor CardProcessor {
-    private var reader: CardReader
-
-    init(region: String) {
-        reader = CardReader(parser: CardParser(region: region))
+    struct Output {
+        var result: CardReader.Result
+        /// Set when Claude was enabled but couldn't be used; the on-device result is returned instead.
+        var claudeError: String?
     }
 
-    func read(_ image: CGImage) async throws -> CardReader.Result {
-        try await reader.read(image)
+    func read(_ image: CGImage, region: String, claudeKey: String?) async throws -> Output {
+        var result = try await CardReader(parser: CardParser(region: region)).read(image)
+        guard let claudeKey else { return Output(result: result) }
+        do {
+            let cardRegion = CardParser.inferRegion(from: result.draft.rawLines) ?? region
+            let labelled = try await ClaudeParser(apiKey: claudeKey).parse(result.lines, region: cardRegion)
+            result.draft = ClaudeParser.merge(rules: result.draft, claude: labelled)
+            return Output(result: result)
+        } catch {
+            return Output(result: result, claudeError: error.localizedDescription)
+        }
     }
 
     nonisolated static func save(_ image: CGImage, to url: URL) {

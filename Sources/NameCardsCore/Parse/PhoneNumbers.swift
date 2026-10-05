@@ -35,6 +35,11 @@ public enum PhoneNumbers {
         "FR": Region(callingCode: "33", trunkZero: true, nationalLength: nil, mobilePrefixes: ["336", "337"]),
     ]
 
+    /// ISO codes of regions whose national numbers can be normalised, alphabetically.
+    public static var supportedRegions: [String] { regions.keys.sorted() }
+
+    public static func callingCode(for region: String) -> String? { regions[region]?.callingCode }
+
     /// Mobile prefixes for every known region, used when a number carries its own country code.
     private static let allMobilePrefixes = regions.values.flatMap(\.mobilePrefixes)
 
