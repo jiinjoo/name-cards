@@ -3,21 +3,6 @@ import AVFoundation
 import NameCardsCore
 import Observation
 
-struct ScannedCard: Identifiable {
-    enum Status: Equatable {
-        case reading
-        case ready
-        case failed(String)
-    }
-
-    let id = UUID()
-    let capturedAt = Date()
-    var image: CGImage
-    var imageURL: URL?
-    var draft: DraftContact?
-    var status = Status.reading
-}
-
 @MainActor @Observable
 final class ScanModel {
     enum CameraState: Equatable {
@@ -36,22 +21,14 @@ final class ScanModel {
     var cameraState = CameraState.starting
     var quad: Quad?
     var decision = CaptureGate.Decision.searching
-    var cards: [ScannedCard] = []
-    var eventName = UserDefaults.standard.string(forKey: "eventName") ?? "" {
-        didSet { UserDefaults.standard.set(eventName, forKey: "eventName") }
-    }
     /// Briefly true after each capture, for the on-screen flash.
     var flash = false
-    /// Short status message, e.g. a duplicate that was skipped.
-    var notice: String?
 
     let camera = CameraController()
-    private let processor: CardProcessor
-    private var noticeTask: Task<Void, Never>?
+    let session: CardSession
 
-    init() {
-        let region = UserDefaults.standard.string(forKey: "defaultRegion") ?? Locale.current.region?.identifier ?? "US"
-        processor = CardProcessor(region: region)
+    init(session: CardSession) {
+        self.session = session
         camera.onEvent = { [weak self] event in
             Task { @MainActor in self?.handle(event) }
         }
@@ -91,11 +68,6 @@ final class ScanModel {
         camera.captureNow()
     }
 
-    func remove(_ card: ScannedCard) {
-        cards.removeAll { $0.id == card.id }
-        if let url = card.imageURL { try? FileManager.default.removeItem(at: url) }
-    }
-
     private func handle(_ event: CameraEvent) {
         switch event {
         case let .frame(quad, decision):
@@ -112,39 +84,6 @@ final class ScanModel {
         NSSound(named: "Tink")?.play()
         flash = true
         Task { try? await Task.sleep(for: .milliseconds(150)); flash = false }
-
-        let card = ScannedCard(image: image)
-        cards.insert(card, at: 0)
-        Task {
-            do {
-                let (result, url) = try await processor.read(image, id: card.id)
-                guard let index = cards.firstIndex(where: { $0.id == card.id }) else { return }
-                let earlier = cards.filter { $0.id != card.id && $0.status == .ready }.compactMap(\.draft)
-                if let original = SessionDeduper.duplicate(of: result.draft, in: earlier) {
-                    let name = original.displayName.isEmpty ? "this card" : original.displayName
-                    cards.remove(at: index)
-                    if let url { try? FileManager.default.removeItem(at: url) }
-                    show(notice: "Already scanned \(name) — skipped")
-                    return
-                }
-                cards[index].image = result.image
-                cards[index].imageURL = url
-                cards[index].draft = result.draft
-                cards[index].status = .ready
-            } catch {
-                if let index = cards.firstIndex(where: { $0.id == card.id }) {
-                    cards[index].status = .failed(error.localizedDescription)
-                }
-            }
-        }
-    }
-
-    private func show(notice: String) {
-        self.notice = notice
-        noticeTask?.cancel()
-        noticeTask = Task {
-            try? await Task.sleep(for: .seconds(3))
-            if !Task.isCancelled { self.notice = nil }
-        }
+        session.add(image)
     }
 }

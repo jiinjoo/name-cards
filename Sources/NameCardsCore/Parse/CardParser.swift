@@ -236,7 +236,7 @@ public struct CardParser: Sendable {
     ]
 
     /// The card's own country, used to read phone numbers printed without a country code.
-    static func inferRegion(from texts: [String]) -> String? {
+    public static func inferRegion(from texts: [String]) -> String? {
         let joined = texts.joined(separator: "\n")
         let lower = joined.lowercased()
         if let place = regionByPlace.first(where: { lower.containsWord($0.0) || ($0.0.cjkCount > 0 || $0.0 == "〒") && lower.contains($0.0) }) {

@@ -1,9 +1,9 @@
 import Foundation
 
 /// A contact extracted from a business card, awaiting user review.
-public struct DraftContact: Identifiable, Hashable, Sendable {
+public struct DraftContact: Identifiable, Hashable, Codable, Sendable {
     /// Fields the user reviews; each carries a parser confidence so the UI can highlight weak guesses.
-    public enum Field: String, CaseIterable, Hashable, Sendable {
+    public enum Field: String, CaseIterable, Hashable, Codable, CodingKeyRepresentable, Sendable {
         case name, phoneticName, nickname, jobTitle, department, organization, phones, emails, urls, address
     }
 
@@ -37,8 +37,8 @@ public struct DraftContact: Identifiable, Hashable, Sendable {
     public func confidence(for field: Field) -> Double { confidence[field] ?? 0 }
 }
 
-public struct Phone: Hashable, Sendable {
-    public enum Kind: String, CaseIterable, Hashable, Sendable { case mobile, work, fax, main, other }
+public struct Phone: Hashable, Codable, Sendable {
+    public enum Kind: String, CaseIterable, Hashable, Codable, Sendable { case mobile, work, fax, main, other }
 
     /// E.164 (e.g. "+6591234567") when normalisation succeeded, otherwise the text as printed.
     public var number: String

@@ -14,7 +14,8 @@ Guide for AI coding agents (and humans) working in this repository.
    rule-based parsing into a `DraftContact`. Optionally the *OCR text* (never the image) is sent to the Claude
    API for better field labelling.
 3. **Review** – the user verifies and fixes every draft in a list beside the card image. Low-confidence fields
-   are highlighted.
+   are highlighted, and any OCR line can be re-assigned to a field ("Use as"). Each card is approved or
+   skipped. The whole session is saved to disk continuously, so quitting mid-event loses nothing.
 4. **Merge & save** – each draft is matched against existing contacts. A field-by-field merge is proposed and
    the user confirms it. The result is written to the **iCloud** contacts container and added to a per-session
    "Met at" group.
@@ -56,7 +57,9 @@ Package.swift
 Resources/Info.plist              bundle metadata + NSCameraUsageDescription / NSContactsUsageDescription
 scripts/bundle.sh                 swift build -c release → NameCards.app → codesign
 Sources/NameCardsCore/            pure logic, no SwiftUI; everything here is unit-testable
-  Model/        DraftContact (fields + per-field confidence), OCRLine
+  Model/        DraftContact (fields + per-field confidence; Codable), editing helpers (LineAssignment,
+                fieldsNeedingAttention), CardRecord (one card's review state), OCRLine
+  Session/      SessionStore: session.json + card images in ~/Library/Application Support/NameCards
   Capture/      CaptureGate (when to auto-capture: pure state machine), CardDetector (Vision rectangles +
                 perspective crop), ImageMetrics (sharpness), Quad
   OCR/          TextRecognizer: two-pass Vision OCR → lines with bounding boxes (async, private queue);
@@ -72,9 +75,10 @@ Sources/nc-scan/                  developer CLI: run OCR + parser on image files
 Sources/NameCards/                SwiftUI app target
   App/          NameCardsApp
   Capture/      CameraController: AVCaptureSession, analyses frames on its video queue, photo capture
-  Scan/         ScanModel (@MainActor @Observable session state), CardProcessor (actor; reads cards and saves
-                images to ~/Library/Application Support/NameCards/Cards)
-  UI/           ScanView, CameraPreview (preview layer + outline), CardTray; later ReviewListView, MergeSheet,
+  Scan/         CardSession (@MainActor @Observable: all cards, reading, dedupe, debounced persistence),
+                ScanModel (camera state only), CardProcessor (actor: OCR one card at a time; image I/O)
+  UI/           RootView (Scan | Review switch; camera stops while reviewing), ScanView, CameraPreview,
+                CardTray, ReviewView (filtered list), ReviewDetail (field editor); later MergeSheet,
                 SettingsView
 Tests/NameCardsCoreTests/         parser fixtures (EN/ZH/JA/KO OCR outputs), end-to-end Vision tests on
                                   rendered cards, matcher, merge planner

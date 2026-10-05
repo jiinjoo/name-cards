@@ -8,7 +8,7 @@ struct ScanView: View {
         HSplitView {
             cameraPane
                 .frame(minWidth: 480, minHeight: 360)
-            CardTray(model: model)
+            CardTray(session: model.session)
                 .frame(minWidth: 280, idealWidth: 320, maxWidth: 420)
         }
         .toolbar {
@@ -22,7 +22,7 @@ struct ScanView: View {
                 .help("Camera used for scanning")
             }
             ToolbarItem {
-                TextField("Event, e.g. Tech Expo 2026", text: $model.eventName)
+                TextField("Event, e.g. Tech Expo 2026", text: Bindable(model.session).eventName)
                     .frame(width: 220)
                     .help("Where you met these people. Used to group the contacts.")
             }
@@ -33,6 +33,7 @@ struct ScanView: View {
             }
         }
         .task { await model.start() }
+        .onDisappear { model.camera.stop() }
     }
 
     @ViewBuilder private var cameraPane: some View {
@@ -88,7 +89,7 @@ struct ScanView: View {
         .padding(.vertical, 8)
         .background(.regularMaterial, in: Capsule())
         .overlay(alignment: .top) {
-            if let notice = model.notice {
+            if let notice = model.session.notice {
                 Text(notice)
                     .font(.callout)
                     .padding(.horizontal, 14)
@@ -99,6 +100,6 @@ struct ScanView: View {
                     .transition(.opacity)
             }
         }
-        .animation(.default, value: model.notice)
+        .animation(.default, value: model.session.notice)
     }
 }
