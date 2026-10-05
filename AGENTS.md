@@ -44,6 +44,7 @@ Guide for AI coding agents (and humans) working in this repository.
 | Build `NameCards.app` (release, signed) | `make app` |
 | Build and launch the app | `make run` |
 | OCR + parse card images from the terminal | `swift run nc-scan [--region SG] [--lines] card.jpg …` |
+| Regenerate the app icon | `./scripts/make-icon.sh` |
 | Clean | `make clean` |
 
 Tests use **Swift Testing** (`import Testing`, `@Test`, `#expect`). XCTest is not available with Command Line
@@ -78,7 +79,8 @@ Sources/NameCardsCore/            pure logic, no SwiftUI; everything here is uni
                 ContactStoring protocol + ContactStore (real DB on a private queue; iCloud container, groups)
 Sources/nc-scan/                  developer CLI: run OCR + parser on image files
 Sources/NameCards/                SwiftUI app target
-  App/          NameCardsApp
+  App/          NameCardsApp, AppState (mode + shared models), AppCommands (Go and Card menus: every keyboard
+                shortcut is defined here, not on buttons, except Scan's ⌘↩ Capture Now)
   Capture/      CameraController: AVCaptureSession, analyses frames on its video queue, photo capture
   Scan/         CardSession (@MainActor @Observable: all cards, reading, dedupe, debounced persistence),
                 ScanModel (camera state only), CardProcessor (actor: OCR one card at a time; image I/O)
@@ -86,9 +88,10 @@ Sources/NameCards/                SwiftUI app target
                 options, Claude toggle + key + Test, clear saved cards)
   Save/         SaveModel (permission → match approved cards → save; marks cards saved), SaveSheet (new vs
                 merge picker, tickable changes, event group / photo options)
-  UI/           RootView (Scan | Review switch; camera stops while reviewing), ScanView, CameraPreview,
-                CardTray, ReviewView (filtered list, Save to Contacts), ReviewDetail (field editor); later
-                SettingsView
+  Review/       ReviewModel (filter, selection, approve/skip/next, Approve All Clean, save sheet state),
+                ReviewView (list + toolbar), ReviewDetail (field editor)
+  UI/           RootView (Scan | Review switch, Dock badge; camera stops while reviewing), ScanView,
+                CameraPreview, CardTray (double-click → Review)
 Tests/NameCardsCoreTests/         parser fixtures (EN/ZH/JA/KO OCR outputs), end-to-end Vision tests on
                                   rendered cards, matcher, merge planner
 ```

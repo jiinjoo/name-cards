@@ -3,10 +3,10 @@ import SwiftUI
 
 /// Editor for one card: the card image beside its extracted fields, with uncertain fields highlighted.
 struct ReviewDetail: View {
-    let session: CardSession
+    let model: ReviewModel
     let cardID: UUID
-    /// Called after the card is approved or skipped.
-    let onDone: () -> Void
+
+    private var session: CardSession { model.session }
 
     @State private var enlarged = false
 
@@ -79,21 +79,14 @@ struct ReviewDetail: View {
                         .foregroundStyle(.orange)
                 }
                 Spacer()
-                Button("Read Again") { session.retry(cardID) }
-                    .help("Re-read this card with the current settings, e.g. after turning on Claude. Replaces your edits.")
+                // Shortcuts for these live in the Card menu (AppCommands).
+                Button("Read Again") { model.readAgain() }
+                    .help("Re-read this card with the current settings, e.g. after turning on Claude. Replaces your edits. (⌘R)")
                     .disabled(card?.record.status == .reading)
-                Button("Skip") {
-                    session.setReview(cardID, .skipped)
-                    onDone()
-                }
-                .keyboardShortcut("s", modifiers: [.command, .shift])
-                .help("Don't add this card to Contacts (⇧⌘S)")
-                Button("Approve") {
-                    session.setReview(cardID, .approved)
-                    onDone()
-                }
-                .keyboardShortcut(.return, modifiers: .command)
-                .buttonStyle(.borderedProminent)
+                Button("Skip") { model.skip() }
+                    .help("Don't add this card to Contacts (⇧⌘S)")
+                Button("Approve") { model.approve() }
+                    .buttonStyle(.borderedProminent)
                 .disabled(card?.record.status != .ready)
                 .help("The details are correct; queue this contact for saving (⌘↩)")
             }

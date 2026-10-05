@@ -3,33 +3,25 @@ import SwiftUI
 
 /// Card list on the left, editor for the selected card on the right.
 struct ReviewView: View {
-    enum Filter: String, CaseIterable, Identifiable {
-        case toReview = "To Review", approved = "Approved", saved = "Saved", skipped = "Skipped", all = "All"
-        var id: Self { self }
-    }
-
-    let session: CardSession
-    @State private var filter = Filter.toReview
-    @State private var selection: UUID?
-    @State private var saving: SaveModel?
+    @Bindable var model: ReviewModel
 
     var body: some View {
         HSplitView {
             VStack(spacing: 0) {
-                Picker("Show", selection: $filter) {
-                    ForEach(Filter.allCases) { Text($0.rawValue).tag($0) }
+                Picker("Show", selection: $model.filter) {
+                    ForEach(ReviewModel.Filter.allCases) { Text($0.rawValue).tag($0) }
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .padding(10)
                 Divider()
-                if visibleCards.isEmpty {
+                if model.visibleCards.isEmpty {
                     ContentUnavailableView(emptyTitle, systemImage: "checkmark.circle")
                 } else {
-                    List(visibleCards, selection: $selection) { card in
+                    List(model.visibleCards, selection: $model.selection) { card in
                         ReviewRow(card: card).tag(card.id)
                             .contextMenu {
-                                Button("Delete Card", role: .destructive) { session.remove(card.id) }
+                                Button("Delete Card", role: .destructive) { model.session.remove(card.id) }
                             }
                     }
                     .listStyle(.inset)
@@ -38,9 +30,8 @@ struct ReviewView: View {
             .frame(minWidth: 280, idealWidth: 320, maxWidth: 420)
 
             Group {
-                if let id = selection, session.card(id) != nil {
-                    ReviewDetail(session: session, cardID: id, onDone: { advance(from: id) })
-                        .id(id)
+                if let id = model.selection, model.session.card(id) != nil {
+                    ReviewDetail(model: model, cardID: id).id(id)
                 } else {
                     ContentUnavailableView("Select a card", systemImage: "person.text.rectangle",
                                            description: Text("Check each card's details, fix any mistakes, then approve it."))
@@ -50,51 +41,32 @@ struct ReviewView: View {
         }
         .toolbar {
             ToolbarItem {
-                Button("Save to Contacts", systemImage: "person.crop.circle.badge.plus") {
-                    saving = SaveModel(session: session)
-                }
-                .disabled(session.approvedCards.isEmpty)
-                .help(session.approvedCards.isEmpty
-                      ? "Approve cards first"
-                      : "Save \(session.approvedCards.count) approved card(s) to Contacts")
+                Button("Approve All Clean", systemImage: "checkmark.circle") { model.approveAllClean() }
+                    .disabled(model.cleanCards.isEmpty)
+                    .help(model.cleanCards.isEmpty
+                          ? "No waiting cards are free of highlighted fields"
+                          : "Approve the \(model.cleanCards.count) waiting card(s) with nothing highlighted (⌥⌘↩)")
+            }
+            ToolbarItem {
+                Button("Save to Contacts", systemImage: "person.crop.circle.badge.plus") { model.startSaving() }
+                    .disabled(!model.canSave)
+                    .help(model.canSave
+                          ? "Save \(model.session.approvedCards.count) approved card(s) to Contacts (⌘S)"
+                          : "Approve cards first")
             }
         }
-        .sheet(item: $saving) { model in
-            SaveSheet(model: model)
-        }
-        .onAppear { if selection == nil { selection = visibleCards.first?.id } }
-        .onChange(of: filter) { selection = visibleCards.first?.id }
-    }
-
-    private var visibleCards: [CardSession.Card] {
-        session.cards.filter { card in
-            switch filter {
-            case .toReview: card.record.review == .pending
-            case .approved: card.record.review == .approved
-            case .saved: card.record.review == .saved
-            case .skipped: card.record.review == .skipped
-            case .all: true
-            }
-        }
+        .sheet(item: $model.saving) { SaveSheet(model: $0) }
+        .onAppear { model.selectFirstIfNeeded() }
     }
 
     private var emptyTitle: String {
-        switch filter {
+        switch model.filter {
         case .toReview: "All caught up"
         case .approved: "No approved cards"
         case .saved: "Nothing saved yet"
         case .skipped: "No skipped cards"
         case .all: "No cards scanned yet"
         }
-    }
-
-    /// After approving or skipping, move to the next card still waiting for review.
-    private func advance(from id: UUID) {
-        let pending = session.cards.filter { $0.record.review == .pending }
-        let currentIndex = session.cards.firstIndex { $0.id == id } ?? 0
-        let next = pending.first { card in (session.cards.firstIndex { $0.id == card.id } ?? 0) > currentIndex }
-            ?? pending.first
-        if filter == .toReview || next != nil { selection = next?.id }
     }
 }
 

@@ -4,6 +4,7 @@ import SwiftUI
 /// Cards captured this session, newest first.
 struct CardTray: View {
     let session: CardSession
+    var onOpen: (UUID) -> Void = { _ in }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -15,12 +16,27 @@ struct CardTray: View {
             .padding(12)
             Divider()
             if session.cards.isEmpty {
-                ContentUnavailableView("No cards yet", systemImage: "person.text.rectangle",
-                                       description: Text("Cards appear here as they're captured."))
+                ContentUnavailableView {
+                    Label("No cards yet", systemImage: "person.text.rectangle")
+                } description: {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Cards appear here as they're captured.")
+                        Text("Tips:").bold().padding(.top, 4)
+                        Text("• Use a plain, darker surface behind light cards so the outline is found.")
+                        Text("• Fill about half the frame and hold still for a moment.")
+                        Text("• Avoid glare. Tilt glossy cards slightly away from lights.")
+                        Text("• No outline? Press ⌘↩ to capture anyway.")
+                    }
+                    .multilineTextAlignment(.leading)
+                }
             } else {
                 List(session.cards.reversed()) { card in
                     CardRow(card: card)
+                        .contentShape(Rectangle())
+                        .onTapGesture(count: 2) { onOpen(card.id) }
+                        .help("Double-click to review this card")
                         .contextMenu {
+                            Button("Review Card") { onOpen(card.id) }
                             Button("Delete Card", role: .destructive) { session.remove(card.id) }
                         }
                 }

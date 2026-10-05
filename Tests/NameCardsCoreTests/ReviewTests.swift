@@ -13,6 +13,22 @@ import Testing
         #expect(draft.fieldsNeedingAttention.isEmpty)
     }
 
+    @Test func quickApprovalNeedsCleanReachableContact() {
+        var draft = parse([("Jane Tan", 0.06), ("Acme Pte Ltd", 0.04), ("M +65 9123 4567", 0.04)])
+        #expect(draft.isReadyForQuickApproval)
+
+        var uncertain = draft
+        uncertain.confidence[.organization] = 0.4
+        #expect(!uncertain.isReadyForQuickApproval)
+
+        var unreachable = draft
+        unreachable.phones = []
+        #expect(!unreachable.isReadyForQuickApproval)
+
+        draft.phones.append(Phone(number: "03-2161 1234", raw: "03-2161 1234", kind: .work))
+        #expect(!draft.isReadyForQuickApproval)
+    }
+
     @Test func assignNameSplitsAndClearsHighlight() {
         var draft = DraftContact()
         draft.confidence[.name] = 0.3

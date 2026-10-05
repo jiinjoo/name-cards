@@ -42,6 +42,13 @@ extension DraftContact {
         fieldsNeedingAttention.contains(field)
     }
 
+    /// Safe to approve without opening: nothing highlighted, a name, a way to reach the person, and every
+    /// phone number in international format.
+    public var isReadyForQuickApproval: Bool {
+        fieldsNeedingAttention.isEmpty && hasValue(.name) && (hasValue(.phones) || hasValue(.emails))
+            && phones.allSatisfy(\.isNormalized)
+    }
+
     /// Records that the user has checked or typed a field, so it is no longer highlighted.
     public mutating func markReviewed(_ field: Field) {
         confidence[field] = 1

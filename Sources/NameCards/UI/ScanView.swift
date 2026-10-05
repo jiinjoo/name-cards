@@ -3,12 +3,14 @@ import SwiftUI
 
 struct ScanView: View {
     @Bindable var model: ScanModel
+    /// Opens a card from the tray in Review.
+    var onOpenCard: (UUID) -> Void = { _ in }
 
     var body: some View {
         HSplitView {
             cameraPane
                 .frame(minWidth: 480, minHeight: 360)
-            CardTray(session: model.session)
+            CardTray(session: model.session, onOpen: onOpenCard)
                 .frame(minWidth: 280, idealWidth: 320, maxWidth: 420)
         }
         .toolbar {

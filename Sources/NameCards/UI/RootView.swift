@@ -1,29 +1,32 @@
+import AppKit
 import SwiftUI
 
 /// Switches between scanning (camera on) and reviewing (camera off).
 struct RootView: View {
-    enum Mode: Hashable { case scan, review }
-
-    let session: CardSession
-    let scanModel: ScanModel
-    @State private var mode = Mode.scan
+    @Bindable var state: AppState
 
     var body: some View {
         Group {
-            switch mode {
-            case .scan: ScanView(model: scanModel)
-            case .review: ReviewView(session: session)
+            switch state.mode {
+            case .scan: ScanView(model: state.scan, onOpenCard: state.open)
+            case .review: ReviewView(model: state.review)
             }
         }
         .toolbar {
             ToolbarItem(placement: .principal) {
-                Picker("Mode", selection: $mode) {
-                    Text("Scan").tag(Mode.scan)
-                    Text(session.pendingCount > 0 ? "Review (\(session.pendingCount))" : "Review").tag(Mode.review)
+                Picker("Mode", selection: $state.mode) {
+                    Text("Scan").tag(AppState.Mode.scan)
+                    Text(pending > 0 ? "Review (\(pending))" : "Review").tag(AppState.Mode.review)
                 }
                 .pickerStyle(.segmented)
                 .frame(width: 220)
+                .help("Scan (⌘1) · Review (⌘2)")
             }
         }
+        .onChange(of: pending, initial: true) {
+            NSApp.dockTile.badgeLabel = pending > 0 ? "\(pending)" : nil
+        }
     }
+
+    private var pending: Int { state.session.pendingCount }
 }
