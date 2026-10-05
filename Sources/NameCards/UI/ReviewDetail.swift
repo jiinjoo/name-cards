@@ -61,7 +61,13 @@ struct ReviewDetail: View {
 
     private var actionBar: some View {
         HStack {
-            if let review = card?.record.review, review != .pending {
+            if card?.record.review == .saved {
+                Label("Saved to Contacts", systemImage: "person.crop.circle.badge.checkmark").foregroundStyle(.blue)
+                Spacer()
+                if let id = card?.record.contactIdentifier, let url = URL(string: "addressbook://\(id)") {
+                    Button("Open in Contacts") { NSWorkspace.shared.open(url) }
+                }
+            } else if let review = card?.record.review, review != .pending {
                 Label(review == .approved ? "Approved" : "Skipped",
                       systemImage: review == .approved ? "checkmark.circle.fill" : "minus.circle")
                     .foregroundStyle(review == .approved ? .green : .secondary)

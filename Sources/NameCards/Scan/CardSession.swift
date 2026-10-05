@@ -98,6 +98,17 @@ final class CardSession {
         scheduleSave()
     }
 
+    func markSaved(_ id: UUID, contactIdentifier: String) {
+        guard let index = index(of: id) else { return }
+        cards[index].record.review = .saved
+        cards[index].record.contactIdentifier = contactIdentifier
+        scheduleSave()
+    }
+
+    var approvedCards: [Card] {
+        cards.filter { $0.record.review == .approved && $0.record.status == .ready && $0.record.draft != nil }
+    }
+
     func remove(_ id: UUID) {
         guard let index = index(of: id) else { return }
         let record = cards.remove(at: index).record

@@ -26,5 +26,5 @@ public enum SessionDeduper {
 
 extension Phone {
     /// Digits only, last 8 at most, so "+65 9123 4567" and "9123 4567" compare equal.
-    var comparable: String { String(number.filter(\.isASCIIDigit).suffix(8)) }
+    public var comparable: String { String(number.filter(\.isASCIIDigit).suffix(8)) }
 }

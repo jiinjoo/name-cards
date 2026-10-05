@@ -10,7 +10,8 @@ public struct CardRecord: Identifiable, Hashable, Codable, Sendable {
     }
 
     public enum Review: String, CaseIterable, Hashable, Codable, Sendable {
-        case pending, approved, skipped
+        /// `saved`: written to Contacts (see `contactIdentifier`).
+        case pending, approved, skipped, saved
     }
 
     public let id: UUID
@@ -22,6 +23,8 @@ public struct CardRecord: Identifiable, Hashable, Codable, Sendable {
     public var draft: DraftContact?
     public var status: Status
     public var review: Review
+    /// The Contacts identifier once saved, so the contact can be opened later.
+    public var contactIdentifier: String?
 
     public init(id: UUID = UUID(), capturedAt: Date = Date(), eventName: String = "", draft: DraftContact? = nil,
                 status: Status = .reading, review: Review = .pending) {

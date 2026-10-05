@@ -27,6 +27,8 @@ Guide for AI coding agents (and humans) working in this repository.
 - **Never write to Contacts without user confirmation.** Every create or merge goes through the review and
   merge UI. Never delete contacts. Never overwrite an existing value silently: replacements need an explicit
   tick, and additive changes (a new phone or email) may be pre-ticked.
+- **Never write to the user's real Contacts while developing or testing**. It syncs to iCloud and every
+  device. Writes happen only from the Save sheet, after the user clicks Save.
 - **Tests never touch the real Contacts database.** Use the `ContactStoring` protocol with an in-memory fake.
 - **No Xcode project.** The build is SwiftPM only (the machine has Command Line Tools, not Xcode). The `.app`
   bundle is assembled by `scripts/bundle.sh`.
@@ -57,7 +59,7 @@ Package.swift
 Resources/Info.plist              bundle metadata + NSCameraUsageDescription / NSContactsUsageDescription
 scripts/bundle.sh                 swift build -c release → NameCards.app → codesign
 Sources/NameCardsCore/            pure logic, no SwiftUI; everything here is unit-testable
-  Model/        DraftContact (fields + per-field confidence; Codable), editing helpers (LineAssignment,
+  Model/        ContactSnapshot (plain copy of an existing contact), DraftContact (fields + per-field confidence; Codable), editing helpers (LineAssignment,
                 fieldsNeedingAttention), CardRecord (one card's review state), OCRLine
   Session/      SessionStore: session.json + card images in ~/Library/Application Support/NameCards
   Capture/      CaptureGate (when to auto-capture: pure state machine), CardDetector (Vision rectangles +
@@ -67,18 +69,22 @@ Sources/NameCardsCore/            pure logic, no SwiftUI; everything here is uni
   Parse/        CardParser (line classification + name selection), PhoneNumbers (labels, E.164),
                 NameSplitter (Latin/Malay/CJK name order), Keywords (multilingual tables), Script;
                 ClaudeParser (optional, URLSession — not built yet)
-  Match/        SessionDeduper (same card scanned twice in a session);
-                ContactMatcher: normalised email/phone exact match, fuzzy name + company (not built yet)
-  Merge/        MergePlanner: DraftContact × existing contact → [FieldChange]
-  Store/        ContactStoring protocol + CNContactStore implementation (iCloud container, groups)
+  Match/        SessionDeduper (same card scanned twice in a session); ContactMatcher (email / mobile exact,
+                Jaro-Winkler name incl. phonetic + company); TextSimilarity
+  Merge/        MergePlanner: DraftContact × ContactSnapshot → MergePlan of FieldChanges (add pre-ticked,
+                replace un-ticked, never remove); SaveItem: one card's destination + ticked changes
+  Store/        ContactMapper (CNContact ⇄ values; unit-tested with in-memory CNMutableContacts),
+                ContactStoring protocol + ContactStore (real DB on a private queue; iCloud container, groups)
 Sources/nc-scan/                  developer CLI: run OCR + parser on image files
 Sources/NameCards/                SwiftUI app target
   App/          NameCardsApp
   Capture/      CameraController: AVCaptureSession, analyses frames on its video queue, photo capture
   Scan/         CardSession (@MainActor @Observable: all cards, reading, dedupe, debounced persistence),
                 ScanModel (camera state only), CardProcessor (actor: OCR one card at a time; image I/O)
+  Save/         SaveModel (permission → match approved cards → save; marks cards saved), SaveSheet (new vs
+                merge picker, tickable changes, event group / photo options)
   UI/           RootView (Scan | Review switch; camera stops while reviewing), ScanView, CameraPreview,
-                CardTray, ReviewView (filtered list), ReviewDetail (field editor); later MergeSheet,
+                CardTray, ReviewView (filtered list, Save to Contacts), ReviewDetail (field editor); later
                 SettingsView
 Tests/NameCardsCoreTests/         parser fixtures (EN/ZH/JA/KO OCR outputs), end-to-end Vision tests on
                                   rendered cards, matcher, merge planner

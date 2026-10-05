@@ -4,13 +4,14 @@ import SwiftUI
 /// Card list on the left, editor for the selected card on the right.
 struct ReviewView: View {
     enum Filter: String, CaseIterable, Identifiable {
-        case toReview = "To Review", approved = "Approved", skipped = "Skipped", all = "All"
+        case toReview = "To Review", approved = "Approved", saved = "Saved", skipped = "Skipped", all = "All"
         var id: Self { self }
     }
 
     let session: CardSession
     @State private var filter = Filter.toReview
     @State private var selection: UUID?
+    @State private var saving: SaveModel?
 
     var body: some View {
         HSplitView {
@@ -47,6 +48,20 @@ struct ReviewView: View {
             }
             .frame(minWidth: 480, maxWidth: .infinity, maxHeight: .infinity)
         }
+        .toolbar {
+            ToolbarItem {
+                Button("Save to Contacts", systemImage: "person.crop.circle.badge.plus") {
+                    saving = SaveModel(session: session)
+                }
+                .disabled(session.approvedCards.isEmpty)
+                .help(session.approvedCards.isEmpty
+                      ? "Approve cards first"
+                      : "Save \(session.approvedCards.count) approved card(s) to Contacts")
+            }
+        }
+        .sheet(item: $saving) { model in
+            SaveSheet(model: model)
+        }
         .onAppear { if selection == nil { selection = visibleCards.first?.id } }
         .onChange(of: filter) { selection = visibleCards.first?.id }
     }
@@ -56,6 +71,7 @@ struct ReviewView: View {
             switch filter {
             case .toReview: card.record.review == .pending
             case .approved: card.record.review == .approved
+            case .saved: card.record.review == .saved
             case .skipped: card.record.review == .skipped
             case .all: true
             }
@@ -66,6 +82,7 @@ struct ReviewView: View {
         switch filter {
         case .toReview: "All caught up"
         case .approved: "No approved cards"
+        case .saved: "Nothing saved yet"
         case .skipped: "No skipped cards"
         case .all: "No cards scanned yet"
         }
@@ -93,6 +110,8 @@ private struct ReviewRow: View {
                 Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).help("Approved")
             case .skipped:
                 Image(systemName: "minus.circle").foregroundStyle(.secondary).help("Skipped")
+            case .saved:
+                Image(systemName: "person.crop.circle.badge.checkmark").foregroundStyle(.blue).help("Saved to Contacts")
             case .pending:
                 if let count = card.record.draft?.fieldsNeedingAttention.count, count > 0 {
                     Text("\(count)")
