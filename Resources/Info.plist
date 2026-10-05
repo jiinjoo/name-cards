@@ -20,6 +20,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>NameCards uses the camera to detect and capture business cards.</string>
+	<key>NSCameraUseContinuityCameraDeviceType</key>
+	<true/>
 	<key>NSContactsUsageDescription</key>
 	<string>NameCards adds scanned business cards to your contacts and checks for duplicates.</string>
 </dict>

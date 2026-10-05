@@ -1,19 +1,38 @@
 import CoreGraphics
+import Foundation
 import Vision
 
-/// On-device OCR via Apple Vision. Synchronous and CPU/ANE heavy: call it off the main actor.
+/// On-device OCR via Apple Vision.
 ///
 /// Vision only reads CJK well when that language is listed *first*, and no single ordering handles
 /// Chinese, Japanese and Korean together. So recognition runs in two passes: an auto-detect pass finds the
 /// card's dominant script, then (for CJK cards) a second pass runs with that language first.
 public struct TextRecognizer: Sendable {
+    /// Vision blocks its calling thread and, on macOS 26, can deadlock when every Swift-concurrency pool
+    /// thread is blocked inside it. All recognition therefore runs on this private serial queue, which
+    /// also keeps OCR to one card at a time.
+    private static let queue = DispatchQueue(label: "namecards.ocr", qos: .userInitiated)
+
     public init() {}
 
     /// Returns recognised lines sorted top-to-bottom, then left-to-right.
-    public func recognize(_ image: CGImage) throws -> [OCRLine] {
-        let detected = try run(on: image, languages: [], automatic: true)
-        guard let languages = Self.preferredLanguages(for: detected.map(\.text)) else { return detected }
-        return try run(on: image, languages: languages, automatic: false)
+    public func recognize(_ image: CGImage) async throws -> [OCRLine] {
+        try await onQueue {
+            let detected = try run(on: image, languages: [], automatic: true)
+            guard let languages = Self.preferredLanguages(for: detected.map(\.text)) else { return detected }
+            return try run(on: image, languages: languages, automatic: false)
+        }
+    }
+
+    /// A single fast, auto-detecting pass; only good enough to compare orientations.
+    func recognizeQuickly(_ image: CGImage) async throws -> [OCRLine] {
+        try await onQueue { try run(on: image, languages: [], automatic: true, level: .fast) }
+    }
+
+    private func onQueue<T: Sendable>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
+        try await withCheckedThrowingContinuation { continuation in
+            Self.queue.async { continuation.resume(with: Result(catching: work)) }
+        }
     }
 
     /// Language order for the second pass, or nil when the card is Latin-only.
@@ -28,9 +47,10 @@ public struct TextRecognizer: Sendable {
         return nil
     }
 
-    private func run(on image: CGImage, languages: [String], automatic: Bool) throws -> [OCRLine] {
+    private func run(on image: CGImage, languages: [String], automatic: Bool,
+                     level: VNRequestTextRecognitionLevel = .accurate) throws -> [OCRLine] {
         let request = VNRecognizeTextRequest()
-        request.recognitionLevel = .accurate
+        request.recognitionLevel = level
         request.usesLanguageCorrection = true
         request.automaticallyDetectsLanguage = automatic
         if !languages.isEmpty { request.recognitionLanguages = languages }

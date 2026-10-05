@@ -28,7 +28,7 @@ for path in paths {
         print("\(path): cannot read image")
         continue
     }
-    let lines = try recognizer.recognize(image)
+    let lines = try await recognizer.recognize(image)
     print("== \(path)")
     if showLines {
         for line in lines {

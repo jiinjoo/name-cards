@@ -7,8 +7,9 @@ Guide for AI coding agents (and humans) working in this repository.
 **NameCards** is a local, native macOS app for bulk-scanning business cards into iCloud Contacts:
 
 1. **Scan** – a live camera feed (Continuity Camera iPhone preferred, built-in camera fallback) auto-detects
-   business cards, waits for a steady, sharp frame, captures a perspective-corrected crop, and skips a card it
-   has already captured.
+   business cards, waits for a steady, sharp frame, takes a full-resolution photo and crops the card from it
+   with perspective correction. A card is captured once while it stays in view, and a card shown again
+   later is dropped by content (same email or mobile, or same name and company).
 2. **Extract** – Apple Vision OCR (English/Latin, Simplified & Traditional Chinese, Japanese, Korean) followed by
    rule-based parsing into a `DraftContact`. Optionally the *OCR text* (never the image) is sent to the Claude
    API for better field labelling.
@@ -55,18 +56,26 @@ Package.swift
 Resources/Info.plist              bundle metadata + NSCameraUsageDescription / NSContactsUsageDescription
 scripts/bundle.sh                 swift build -c release → NameCards.app → codesign
 Sources/NameCardsCore/            pure logic, no SwiftUI; everything here is unit-testable
-  Model/        DraftContact (fields + per-field confidence), FieldChange, etc.
-  OCR/          TextRecognizer: two-pass Vision OCR → lines with bounding boxes
+  Model/        DraftContact (fields + per-field confidence), OCRLine
+  Capture/      CaptureGate (when to auto-capture: pure state machine), CardDetector (Vision rectangles +
+                perspective crop), ImageMetrics (sharpness), Quad
+  OCR/          TextRecognizer: two-pass Vision OCR → lines with bounding boxes (async, private queue);
+                CardReader: OCR + parse, recovering sideways/upside-down cards
   Parse/        CardParser (line classification + name selection), PhoneNumbers (labels, E.164),
                 NameSplitter (Latin/Malay/CJK name order), Keywords (multilingual tables), Script;
                 ClaudeParser (optional, URLSession — not built yet)
-  Match/        ContactMatcher: normalised email/phone exact match, fuzzy name + company
+  Match/        SessionDeduper (same card scanned twice in a session);
+                ContactMatcher: normalised email/phone exact match, fuzzy name + company (not built yet)
   Merge/        MergePlanner: DraftContact × existing contact → [FieldChange]
   Store/        ContactStoring protocol + CNContactStore implementation (iCloud container, groups)
 Sources/nc-scan/                  developer CLI: run OCR + parser on image files
 Sources/NameCards/                SwiftUI app target
-  Capture/      CameraController (AVCaptureSession), CardDetector (rectangles, stability, sharpness, dedupe)
-  UI/           ScanView, ReviewListView, MergeSheet, SettingsView
+  App/          NameCardsApp
+  Capture/      CameraController: AVCaptureSession, analyses frames on its video queue, photo capture
+  Scan/         ScanModel (@MainActor @Observable session state), CardProcessor (actor; reads cards and saves
+                images to ~/Library/Application Support/NameCards/Cards)
+  UI/           ScanView, CameraPreview (preview layer + outline), CardTray; later ReviewListView, MergeSheet,
+                SettingsView
 Tests/NameCardsCoreTests/         parser fixtures (EN/ZH/JA/KO OCR outputs), end-to-end Vision tests on
                                   rendered cards, matcher, merge planner
 ```
@@ -87,6 +96,10 @@ Pipeline: `capture → crop → OCR → parse (+ optional Claude) → match → 
 - OCR: Vision only reads CJK well when that language is listed *first* in `recognitionLanguages`, and no
   single ordering covers zh/ja/ko together. `TextRecognizer` therefore auto-detects first, then re-runs with
   the dominant CJK language first. Keep the `TextRecognizerTests` end-to-end tests passing if you touch this.
+- **Never call Vision synchronously from Swift-concurrency threads** (tasks, actors, async tests). On
+  macOS 26 that deadlocks once every pool thread is blocked inside Vision. `TextRecognizer` runs on a private
+  dispatch queue behind an async API. Other Vision calls (`CardDetector`) run on the camera's own
+  dispatch queues. Follow the same pattern for any new Vision work.
 - When a fixture comes from a real card, capture its OCR lines with `swift run nc-scan --lines`.
 - CJK cards: the native-script name is the primary name. A Latin-script variant goes to the phonetic name
   fields or the nickname.
