@@ -116,6 +116,13 @@ Pipeline: `capture → crop → OCR → parse (+ optional Claude) → match → 
   macOS 26 that deadlocks once every pool thread is blocked inside Vision. `TextRecognizer` runs on a private
   dispatch queue behind an async API. Other Vision calls (`CardDetector`) run on the camera's own
   dispatch queues. Follow the same pattern for any new Vision work.
+- **AVFoundation raises Objective-C exceptions that Swift can't catch, and the app aborts.** Check
+  preconditions before calling into it. For example, `capturePhoto` requires the photo output's video
+  connection to be enabled and active, which isn't the case while macOS video effects reconfigure a
+  Continuity Camera. `CameraController.takePhoto` checks and falls back to the video-frame crop.
+- Camera diagnostics are logged under subsystem `com.jiinjoo.namecards` (category `camera`). Read them
+  with `/usr/bin/log show --last 5m --info --predicate 'subsystem == "com.jiinjoo.namecards"'`. Use the
+  full path: in zsh, `log` is a shell builtin.
 - When a fixture comes from a real card, capture its OCR lines with `swift run nc-scan --lines`.
 - CJK cards: the native-script name is the primary name. A Latin-script variant goes to the phonetic name
   fields or the nickname.

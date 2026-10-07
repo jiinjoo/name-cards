@@ -1,6 +1,9 @@
 import AVFoundation
 import CoreImage
 import NameCardsCore
+import os
+
+private let log = Logger(subsystem: "com.jiinjoo.namecards", category: "camera")
 
 enum CameraEvent: Sendable {
     /// Per analysed frame: the detected card outline (Vision space) and what the capture gate decided.
@@ -74,6 +77,14 @@ final class CameraController: NSObject, @unchecked Sendable {
             if let largest = device.activeFormat.supportedMaxPhotoDimensions.max(by: { $0.width * $0.height < $1.width * $1.height }) {
                 photoOutput.maxPhotoDimensions = largest
             }
+            let photo = photoOutput.connection(with: .video)
+            let format = device.activeFormat.formatDescription.dimensions
+            log.notice("""
+                Using \(device.localizedName, privacy: .public) (\(device.deviceType.rawValue, privacy: .public)), \
+                video \(format.width)x\(format.height), photo connection \
+                \(photo == nil ? "missing" : "enabled=\(photo!.isEnabled) active=\(photo!.isActive)", privacy: .public), \
+                max photo \(self.photoOutput.maxPhotoDimensions.width)x\(self.photoOutput.maxPhotoDimensions.height)
+                """)
             videoQueue.async { [self] in gate.reset() }
         }
     }
@@ -97,14 +108,25 @@ final class CameraController: NSObject, @unchecked Sendable {
         }
     }
 
-    /// Called on videoQueue.
+    /// Takes a full-resolution photo to crop the card from, or uses the video-frame crop when a photo isn't
+    /// possible. Called on videoQueue.
+    ///
+    /// `capturePhoto` raises an Objective-C exception (which Swift can't catch, so the app aborts) when the
+    /// photo output has no enabled, active video connection. That happens, e.g., while macOS video effects
+    /// reconfigure a Continuity Camera. So check first, and fall back rather than crash.
     private func takePhoto(fallback: CGImage, wholeFrame: Bool = false) {
-        guard session.outputs.contains(photoOutput), !wholeFrame else {
+        guard !wholeFrame, session.isRunning, session.outputs.contains(photoOutput),
+              let connection = photoOutput.connection(with: .video), connection.isEnabled, connection.isActive
+        else {
+            if !wholeFrame { log.notice("Photo capture unavailable; using the video frame") }
             onEvent?(.captured(fallback))
             return
         }
         let settings = AVCapturePhotoSettings()
-        settings.maxPhotoDimensions = photoOutput.maxPhotoDimensions
+        let maximum = photoOutput.maxPhotoDimensions
+        if maximum.width > 0 && maximum.height > 0 {
+            settings.maxPhotoDimensions = maximum
+        }
         fallbacks[settings.uniqueID] = fallback
         photoOutput.capturePhoto(with: settings, delegate: self)
     }
