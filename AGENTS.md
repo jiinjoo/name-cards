@@ -44,6 +44,7 @@ Guide for AI coding agents (and humans) working in this repository.
 | Build `NameCards.app` (release, signed) | `make app` |
 | Build and launch the app | `make run` |
 | OCR + parse card images from the terminal | `swift run nc-scan [--region SG] [--lines] card.jpg …` |
+| Universal app + `NameCards-<version>.dmg` (as released) | `make dmg` (`VERSION=… BUILD=…` optional) |
 | Regenerate the app icon | `./scripts/make-icon.sh` |
 | Clean | `make clean` |
 
@@ -136,6 +137,15 @@ Pipeline: `capture → crop → OCR → parse (+ optional Claude) → match → 
   beta header. Check `stop_reason` (`refusal`, `max_tokens`) before reading the text block, and skip
   thinking blocks. Before changing any of this, look up the current API in the `claude-api` skill rather
   than relying on memory. If Claude fails, the card falls back to the on-device result and a notice is shown.
+
+## Releases
+
+Pushing a tag `vX.Y.Z` runs `.github/workflows/release.yml` on a GitHub macOS runner: `swift test`, then
+`make dmg` (universal arm64 + x86_64 via per-architecture builds and `lipo`, since `--arch a --arch b` needs
+full Xcode), then a GitHub Release with the DMG attached and `.github/release-notes.md` as the notes. The app
+is ad-hoc signed (no paid Apple Developer account), so users approve it once in System Settings ›
+Privacy & Security › Open Anyway. The README explains this to non-technical users. Keep the README's
+user-facing sections free of developer jargon.
 
 ## Definition of done
 

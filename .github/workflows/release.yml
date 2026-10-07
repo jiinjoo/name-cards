@@ -1,0 +1,37 @@
+# Builds NameCards and publishes it on the Releases page whenever a version tag (e.g. v0.2.0) is pushed.
+# Standard GitHub-hosted runners are free for public repositories.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write  # needed to create the release
+
+jobs:
+  release:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: swift --version
+
+      - name: Run tests
+        run: swift test
+
+      - name: Build universal app and disk image
+        run: |
+          export VERSION="${GITHUB_REF_NAME#v}"
+          export BUILD="${GITHUB_RUN_NUMBER}"
+          make dmg
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" NameCards-*.dmg \
+            --title "NameCards ${GITHUB_REF_NAME#v}" \
+            --notes-file .github/release-notes.md \
+            --generate-notes

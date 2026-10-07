@@ -8,10 +8,15 @@ app:
 run: app
 	open NameCards.app
 
+# Universal (Apple Silicon + Intel) app packaged as NameCards-<version>.dmg, as published on GitHub Releases.
+dmg:
+	UNIVERSAL=1 ./scripts/bundle.sh
+	./scripts/make-dmg.sh
+
 test:
 	swift test $(TEST_FLAGS)
 
 clean:
-	rm -rf .build NameCards.app
+	rm -rf .build NameCards.app NameCards-*.dmg
 
-.PHONY: app run test clean
+.PHONY: app run dmg test clean
