@@ -68,7 +68,9 @@ Sources/NameCardsCore/            pure logic, no SwiftUI; everything here is uni
   OCR/          TextRecognizer: two-pass Vision OCR → lines with bounding boxes (async, private queue);
                 CardReader: OCR + parse, recovering sideways/upside-down cards
   Parse/        CardParser (line classification + name selection), PhoneNumbers (labels, E.164),
-                NameSplitter (Latin/Malay/CJK name order), Keywords (multilingual tables), Script;
+                NameSplitter (Latin/Malay/CJK name order), Keywords (multilingual tables), Script,
+                TextCleanup (rejoins "a b@x" emails, punctuation spacing, all-caps → capital case;
+                applied to every draft via DraftContact.tidied());
                 ClaudeParser (optional: raw HTTP to the Messages API, schema-constrained JSON, merged
                 with the on-device result so no phone/email it found is lost)
   Match/        SessionDeduper (same card scanned twice in a session); ContactMatcher (email / mobile exact,

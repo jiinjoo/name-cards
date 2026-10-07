@@ -17,6 +17,8 @@ final class ReviewModel {
     var selection: UUID?
     /// Non-nil while the Save to Contacts sheet is open.
     var saving: SaveModel?
+    /// True while the delete confirmation is showing.
+    var confirmingDelete = false
 
     init(session: CardSession) {
         self.session = session
@@ -66,6 +68,15 @@ final class ReviewModel {
     func readAgain() {
         guard let id = selection else { return }
         session.retry(id)
+    }
+
+    /// Removes the selected card and its image, then selects the card that took its place in the list.
+    func deleteSelected() {
+        guard let id = selection else { return }
+        let position = visibleCards.firstIndex { $0.id == id } ?? 0
+        session.remove(id)
+        let remaining = visibleCards
+        selection = remaining.isEmpty ? nil : remaining[min(position, remaining.count - 1)].id
     }
 
     func selectNext() { moveSelection(by: 1) }

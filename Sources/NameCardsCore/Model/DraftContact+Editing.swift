@@ -58,22 +58,23 @@ extension DraftContact {
     public mutating func assign(_ line: String, as assignment: LineAssignment, region: String) {
         let text = line.trimmed
         guard !text.isEmpty else { return }
+        let tidy = TextCleanup.tidy(text)
         switch assignment {
         case .name:
             let parts = NameSplitter.split(text, japaneseContext: rawLines.contains { $0.containsKana })
             namePrefix = parts.prefix
-            givenName = parts.given
-            familyName = parts.family
+            givenName = TextCleanup.tidy(parts.given, isName: true)
+            familyName = TextCleanup.tidy(parts.family, isName: true)
             nameSuffix = parts.suffix
             markReviewed(.name)
         case .jobTitle:
-            jobTitle = text
+            jobTitle = tidy
             markReviewed(.jobTitle)
         case .department:
-            department = text
+            department = tidy
             markReviewed(.department)
         case .organization:
-            organization = text
+            organization = tidy
             markReviewed(.organization)
         case .mobile, .workPhone, .fax:
             let kind: Phone.Kind = assignment == .mobile ? .mobile : assignment == .fax ? .fax : .work
@@ -89,8 +90,9 @@ extension DraftContact {
             }
             markReviewed(.phones)
         case .email:
-            let email = (text.range(of: #"[^\s:：]+@[^\s]+"#, options: .regularExpression).map { String(text[$0]) } ?? text)
-                .lowercased()
+            let repaired = TextCleanup.repairEmailSpacing(text).text
+            let email = (repaired.range(of: #"[^\s:：]+@[^\s]+"#, options: .regularExpression).map { String(repaired[$0]) }
+                ?? repaired).lowercased()
             if !emails.contains(email) { emails.append(email) }
             markReviewed(.emails)
         case .website:
@@ -98,7 +100,7 @@ extension DraftContact {
             if !urls.contains(url) { urls.append(url) }
             markReviewed(.urls)
         case .address:
-            address = address.isEmpty ? text : address + "\n" + text
+            address = address.isEmpty ? tidy : address + "\n" + tidy
             markReviewed(.address)
         }
     }

@@ -56,6 +56,13 @@ struct ReviewView: View {
             }
         }
         .sheet(item: $model.saving) { SaveSheet(model: $0) }
+        .confirmationDialog("Delete this card?", isPresented: $model.confirmingDelete) {
+            Button("Delete Card", role: .destructive) { model.deleteSelected() }
+        } message: {
+            Text(model.selectedCard?.record.review == .saved
+                 ? "The scan is removed from NameCards. The contact already saved stays in Contacts."
+                 : "The scanned image and its details are removed. This can't be undone.")
+        }
         .onAppear { model.selectFirstIfNeeded() }
     }
 

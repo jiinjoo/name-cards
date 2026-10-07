@@ -14,7 +14,7 @@ import Testing
         #expect(draft.familyName == "Tan")
         #expect(draft.confidence(for: .name) >= 0.9)
         #expect(draft.jobTitle == "Senior Product Manager")
-        #expect(draft.organization == "ACME ROBOTICS")
+        #expect(draft.organization == "Acme Robotics")
         #expect(draft.phones == [
             Phone(number: "+6561234567", raw: "+65 6123 4567", kind: .work),
             Phone(number: "+6591234567", raw: "+65 9123 4567", kind: .mobile),

@@ -31,14 +31,22 @@ struct CardTray: View {
                 }
             } else {
                 List(session.cards.reversed()) { card in
-                    CardRow(card: card)
-                        .contentShape(Rectangle())
-                        .onTapGesture(count: 2) { onOpen(card.id) }
-                        .help("Double-click to review this card")
-                        .contextMenu {
-                            Button("Review Card") { onOpen(card.id) }
-                            Button("Delete Card", role: .destructive) { session.remove(card.id) }
+                    HStack {
+                        CardRow(card: card)
+                        Spacer(minLength: 4)
+                        Button { session.remove(card.id) } label: {
+                            Image(systemName: "trash").foregroundStyle(.secondary)
                         }
+                        .buttonStyle(.borderless)
+                        .help("Delete this scan, e.g. if it's blurry or cut off")
+                    }
+                    .contentShape(Rectangle())
+                    .onTapGesture(count: 2) { onOpen(card.id) }
+                    .help("Double-click to review this card")
+                    .contextMenu {
+                        Button("Review Card") { onOpen(card.id) }
+                        Button("Delete Card", role: .destructive) { session.remove(card.id) }
+                    }
                 }
                 .listStyle(.inset)
             }

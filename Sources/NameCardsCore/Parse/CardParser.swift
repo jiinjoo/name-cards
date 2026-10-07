@@ -84,7 +84,7 @@ public struct CardParser: Sendable {
             draft.address = addressLines.sorted { $0.index < $1.index }.map(\.text).joined(separator: "\n")
             draft.confidence[.address] = 0.7
         }
-        return draft
+        return draft.tidied()
     }
 
     // MARK: - Normalisation
@@ -107,6 +107,7 @@ public struct CardParser: Sendable {
     /// Moves emails, URLs and phone numbers into `draft` and returns the lines with those parts removed.
     private func extractContactDetails(from items: [Item], region: String, into draft: inout DraftContact) -> [Item] {
         var remaining: [Item] = []
+        var emailsRepaired = false
         // Vision sometimes reads a label ("手機：") as its own line, separate from the number after it.
         var pendingKind: Phone.Kind?
         for var item in items {
@@ -115,7 +116,7 @@ public struct CardParser: Sendable {
                 pendingKind = kind
                 continue
             }
-            var text = item.text
+            var (text, repairedEmail) = TextCleanup.repairEmailSpacing(item.text)
             var extracted = false
 
             for match in Self.matches(Self.emailPattern, in: text).reversed() {
@@ -123,6 +124,7 @@ public struct CardParser: Sendable {
                 if !draft.emails.contains(email) { draft.emails.append(email) }
                 text.replaceSubrange(match, with: " ")
                 extracted = true
+                emailsRepaired = emailsRepaired || repairedEmail
             }
             for match in Self.matches(Self.urlPattern, in: text).reversed() {
                 let url = String(text[match]).trimmingCharacters(in: CharacterSet(charactersIn: ".,/"))
@@ -153,7 +155,8 @@ public struct CardParser: Sendable {
             item.text = text.collapsingWhitespace
             remaining.append(item)
         }
-        if !draft.emails.isEmpty { draft.confidence[.emails] = 0.95 }
+        // A rejoined email ("nagisa sugimura@" → "nagisa.sugimura@") is a guess the user should check.
+        if !draft.emails.isEmpty { draft.confidence[.emails] = emailsRepaired ? 0.5 : 0.95 }
         if !draft.urls.isEmpty { draft.confidence[.urls] = 0.9 }
         if !draft.phones.isEmpty {
             draft.confidence[.phones] = draft.phones.allSatisfy(\.isNormalized) ? 0.9 : 0.6

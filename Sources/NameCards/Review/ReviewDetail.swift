@@ -61,6 +61,10 @@ struct ReviewDetail: View {
 
     private var actionBar: some View {
         HStack {
+            Button(role: .destructive) { model.confirmingDelete = true } label: {
+                Label("Delete", systemImage: "trash")
+            }
+            .help("Remove this card from NameCards, e.g. a bad scan")
             if card?.record.review == .saved {
                 Label("Saved to Contacts", systemImage: "person.crop.circle.badge.checkmark").foregroundStyle(.blue)
                 Spacer()
@@ -141,7 +145,8 @@ private struct DraftEditor: View {
                     StringList(values: list(\.urls, .urls), placeholder: "www.example.com", addLabel: "Add Website")
                 }
                 FieldRow("Address", needsCheck: draft.needsAttention(.address)) {
-                    TextField("Address", text: text(\.address, .address), axis: .vertical).lineLimit(1...5)
+                    // Addresses span several lines, so the field starts tall and grows with its content.
+                    TextField("Address", text: text(\.address, .address), axis: .vertical).lineLimit(4...10)
                 }
             }
             if !draft.rawLines.isEmpty {

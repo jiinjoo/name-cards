@@ -23,6 +23,9 @@ struct AppCommands: Commands {
             Button("Read Again") { review.readAgain() }
                 .keyboardShortcut("r")
                 .disabled(!reviewing || review.selectedCard == nil)
+            // No shortcut: ⌘⌫ would fire while editing a text field.
+            Button("Delete Card…") { review.confirmingDelete = true }
+                .disabled(!reviewing || review.selectedCard == nil)
             Divider()
             Button("Next Card") { review.selectNext() }
                 .keyboardShortcut("]")

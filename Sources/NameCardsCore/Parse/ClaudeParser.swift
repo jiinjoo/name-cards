@@ -202,6 +202,7 @@ public struct ClaudeParser: Sendable {
         draft.urls = fields.urls.map(\.trimmed).filter { !$0.isEmpty }
         draft.address = fields.address.trimmed
 
+        draft = draft.tidied()
         let uncertain = Set(fields.uncertainFields.compactMap(DraftContact.Field.init(rawValue:)))
         for field in DraftContact.Field.allCases where draft.hasValue(field) {
             draft.confidence[field] = uncertain.contains(field) ? 0.5 : 0.9
